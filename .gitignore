@@ -1,0 +1,59 @@
+# Compiled Object files
+*.slo
+*.lo
+*.o
+*.obj
+
+# Precompiled Headers
+*.gch
+*.pch
+
+# Compiled Dynamic libraries
+*.so
+*.dylib
+*.dll
+
+# Fortran module files
+*.mod
+*.smod
+
+# Compiled Static libraries
+*.lai
+*.la
+*.a
+*.lib
+
+# Executables
+*.exe
+*.out
+*.app
+
+# vim swap files
+*.swp
+
+# Visual studio hidden stuff
+.vs
+
+# XCode
+xcuserdata
+DerivedData
+WorkspaceSettings.xcsettings
+
+# Visual studio build folder
+build
+
+# Visual studio intermediate folder
+intermediate
+
+# cmake build results
+demo/demo
+
+# cmake intermediate files and folders
+CMakeCache.txt
+CMakeFiles
+Makefile
+cmake_install.cmake
+
+#final artefacts
+wizard/wizard
+log.txt
