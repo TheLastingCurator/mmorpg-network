@@ -1,0 +1,371 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{6A1411C8-5CE9-42FA-BCB3-9EE826107EFB}</ProjectGuid>
+    <Keyword>Win32Proj</Keyword>
+    <RootNamespace>test_01</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <CharacterSet>NotSet</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>NotSet</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <CharacterSet>NotSet</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>NotSet</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="Shared">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <LinkIncremental>true</LinkIncremental>
+    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);$(SolutionDir)\..\;</IncludePath>
+    <TargetName>$(ProjectName)_$(Configuration)_$(Platform)</TargetName>
+    <IntDir>$(SolutionDir)\intermediate\$(Configuration)\${Platform}\</IntDir>
+    <OutDir>$(SolutionDir)\build\</OutDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <LinkIncremental>true</LinkIncremental>
+    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);$(SolutionDir)\..\;</IncludePath>
+    <TargetName>$(ProjectName)_$(Configuration)_$(Platform)</TargetName>
+    <IntDir>$(SolutionDir)\intermediate\$(Configuration)\${Platform}\</IntDir>
+    <OutDir>$(SolutionDir)\build\</OutDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <LinkIncremental>false</LinkIncremental>
+    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);$(SolutionDir)\..\;</IncludePath>
+    <TargetName>$(ProjectName)_$(Configuration)_$(Platform)</TargetName>
+    <IntDir>$(SolutionDir)\intermediate\$(Configuration)\${Platform}\</IntDir>
+    <OutDir>$(SolutionDir)\build\</OutDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <LinkIncremental>false</LinkIncremental>
+    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);$(SolutionDir)\..\;</IncludePath>
+    <TargetName>$(ProjectName)_$(Configuration)_$(Platform)</TargetName>
+    <IntDir>$(SolutionDir)\intermediate\$(Configuration)\${Platform}\</IntDir>
+    <OutDir>$(SolutionDir)\build\</OutDir>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <ClCompile>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>Disabled</Optimization>
+      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;WIN32;_DEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <SDLCheck>true</SDLCheck>
+      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
+      <DisableSpecificWarnings>4201</DisableSpecificWarnings>
+      <TreatWarningAsError>true</TreatWarningAsError>
+      <AdditionalIncludeDirectories>..\arctic;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <StackReserveSize>16777216</StackReserveSize>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>Disabled</Optimization>
+      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;_DEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <SDLCheck>true</SDLCheck>
+      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
+      <DisableSpecificWarnings>4201</DisableSpecificWarnings>
+      <TreatWarningAsError>true</TreatWarningAsError>
+      <AdditionalIncludeDirectories>..\arctic;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <StackReserveSize>16777216</StackReserveSize>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <Optimization>MaxSpeed</Optimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;WIN32;NDEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <TreatWarningAsError>true</TreatWarningAsError>
+      <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
+      <EnableEnhancedInstructionSet>StreamingSIMDExtensions</EnableEnhancedInstructionSet>
+      <FloatingPointModel>Fast</FloatingPointModel>
+      <BufferSecurityCheck>false</BufferSecurityCheck>
+      <CallingConvention>FastCall</CallingConvention>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <AdditionalIncludeDirectories>..\arctic;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <StackReserveSize>16777216</StackReserveSize>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <Optimization>MaxSpeed</Optimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;NDEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PrecompiledHeaderFile />
+      <TreatWarningAsError>true</TreatWarningAsError>
+      <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
+      <EnableEnhancedInstructionSet>StreamingSIMDExtensions</EnableEnhancedInstructionSet>
+      <FloatingPointModel>Fast</FloatingPointModel>
+      <BufferSecurityCheck>false</BufferSecurityCheck>
+      <CallingConvention>FastCall</CallingConvention>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <AdditionalIncludeDirectories>..\arctic;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <StackReserveSize>16777216</StackReserveSize>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <Text Include="ReadMe.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\arctic\engine\arctic_input.h" />
+    <ClInclude Include="..\arctic\engine\arctic_math.h" />
+    <ClInclude Include="..\arctic\engine\arctic_platform.h" />
+    <ClInclude Include="..\arctic\engine\arctic_types.h" />
+    <ClInclude Include="..\arctic\engine\bound2f.h" />
+    <ClInclude Include="..\arctic\engine\bound3f.h" />
+    <ClInclude Include="..\arctic\engine\easy.h" />
+    <ClInclude Include="..\arctic\engine\easy_sound.h" />
+    <ClInclude Include="..\arctic\engine\easy_sound_instance.h" />
+    <ClInclude Include="..\arctic\engine\easy_sprite.h" />
+    <ClInclude Include="..\arctic\engine\easy_sprite_instance.h" />
+    <ClInclude Include="..\arctic\engine\engine.h" />
+    <ClInclude Include="..\arctic\engine\mesh_gen_face_ops.h" />
+    <ClInclude Include="..\arctic\engine\csv.h" />
+    <ClInclude Include="..\arctic\engine\dual_complex.h" />
+    <ClInclude Include="..\arctic\engine\easy_input.h" />
+    <ClInclude Include="..\arctic\engine\easy_util.h" />
+    <ClInclude Include="..\arctic\engine\optionparser.h" />
+    <ClInclude Include="..\arctic\engine\mesh_gen_ite_simple.h" />
+    <ClInclude Include="..\arctic\engine\mesh_ply.h" />
+    <ClInclude Include="..\arctic\engine\mesh_gen_mod_complex.h" />
+    <ClInclude Include="..\arctic\engine\wave_function_collapse.h" />
+    <ClInclude Include="..\arctic\engine\data_reader.h" />
+    <ClInclude Include="..\arctic\engine\easing.h" />
+    <ClInclude Include="..\arctic\engine\arctic_platform_fatal.h" />
+    <ClInclude Include="..\arctic\engine\mtq_fixed_block_queue.h" />
+    <ClInclude Include="..\arctic\engine\decorated_frame.h" />
+    <ClInclude Include="..\arctic\engine\transform3f.h" />
+    <ClInclude Include="..\arctic\engine\test_main.h" />
+    <ClInclude Include="..\arctic\engine\mesh_gen.h" />
+    <ClInclude Include="..\arctic\engine\vec2d.h" />
+    <ClInclude Include="..\arctic\engine\stb_vorbis.inc" />
+    <ClInclude Include="..\arctic\engine\test.h" />
+    <ClInclude Include="..\arctic\engine\mesh_gen_mod_simple.h" />
+    <ClInclude Include="..\arctic\engine\mtq_mpsc_vinfarr.h" />
+    <ClInclude Include="..\arctic\engine\quaternion.h" />
+    <ClInclude Include="..\arctic\engine\vec3d.h" />
+    <ClInclude Include="..\arctic\engine\mesh_obj.h" />
+    <ClInclude Include="..\arctic\engine\mesh.h" />
+    <ClInclude Include="..\arctic\engine\mesh_intersect.h" />
+    <ClInclude Include="..\arctic\engine\transform2f.h" />
+    <ClInclude Include="..\arctic\engine\easy_drawing.h" />
+    <ClInclude Include="..\arctic\engine\miniz.h" />
+    <ClInclude Include="..\arctic\engine\ini.h" />
+    <ClInclude Include="..\arctic\engine\skeleton.h" />
+    <ClInclude Include="..\arctic\engine\gui.h" />
+    <ClInclude Include="..\arctic\engine\unicode.h" />
+    <ClInclude Include="..\arctic\engine\mesh_gen_adjacency.h" />
+    <ClInclude Include="..\arctic\engine\arctic_mixer.h" />
+    <ClInclude Include="..\arctic\engine\mtq_mempool_allocator.h" />
+    <ClInclude Include="..\arctic\engine\mtq_base_common.h" />
+    <ClInclude Include="..\arctic\engine\glext.h" />
+    <ClInclude Include="..\arctic\engine\bitstream.h" />
+    <ClInclude Include="..\arctic\engine\mtq_mpsc_tail_swap.h" />
+    <ClInclude Include="..\arctic\engine\pugixml.h" />
+    <ClInclude Include="..\arctic\engine\mesh_gen_prim_simple.h" />
+    <ClInclude Include="..\arctic\engine\arctic_platform_macosx_sound.mm" />
+    <ClInclude Include="..\arctic\engine\ofbx.h" />
+    <ClInclude Include="..\arctic\engine\node2f.h" />
+    <ClInclude Include="..\arctic\engine\data_writer.h" />
+    <ClInclude Include="..\arctic\engine\easy_advanced.h" />
+    <ClInclude Include="..\arctic\engine\template_tune.h" />
+    <ClInclude Include="..\arctic\engine\easy_files.h" />
+    <ClInclude Include="..\arctic\engine\sound_handle.h" />
+    <ClInclude Include="..\arctic\engine\array2.h" />
+    <ClInclude Include="..\arctic\engine\mat22d.h" />
+    <ClInclude Include="..\arctic\engine\mtq_spmc_array.h" />
+    <ClInclude Include="..\arctic\engine\arctic_platform_macosx.mm" />
+    <ClInclude Include="..\arctic\engine\glcorearb.h" />
+    <ClInclude Include="..\arctic\engine\sound_task.h" />
+    <ClInclude Include="..\arctic\engine\arctic_platform_tcpip.h" />
+    <ClInclude Include="..\arctic\engine\mtq_mpmc_befsbfsp_allocator.h" />
+    <ClInclude Include="..\arctic\engine\arctic_platform_byteorder.h" />
+    <ClInclude Include="..\arctic\engine\arctic_platform_sound.h" />
+    <ClInclude Include="..\arctic\engine\font.h" />
+    <ClInclude Include="..\arctic\engine\frustum3f.h" />
+    <ClInclude Include="..\arctic\engine\log.h" />
+    <ClInclude Include="..\arctic\engine\mat22f.h" />
+    <ClInclude Include="..\arctic\engine\mat33f.h" />
+    <ClInclude Include="..\arctic\engine\mat44f.h" />
+    <ClInclude Include="..\arctic\engine\arctic_platform_def.h" />
+    <ClInclude Include="..\arctic\engine\opengl.h" />
+    <ClInclude Include="..\arctic\engine\rgb.h" />
+    <ClInclude Include="..\arctic\engine\rgba.h" />
+    <ClInclude Include="..\arctic\engine\scalar_math.h" />
+    <ClInclude Include="..\arctic\engine\vec2f.h" />
+    <ClInclude Include="..\arctic\engine\vec2si32.h" />
+    <ClInclude Include="..\arctic\engine\vec3f.h" />
+    <ClInclude Include="..\arctic\engine\vec3si32.h" />
+    <ClInclude Include="..\arctic\engine\vec4f.h" />
+    <ClInclude Include="..\arctic\engine\vec4si32.h" />
+    <ClInclude Include="..\arctic\engine\easy_hw_sprite.h" />
+    <ClInclude Include="..\arctic\engine\easy_hw_sprite_instance.h" />
+    <ClInclude Include="..\arctic\engine\gl_buffer.h" />
+    <ClInclude Include="..\arctic\engine\gl_framebuffer.h" />
+    <ClInclude Include="..\arctic\engine\gl_program.h" />
+    <ClInclude Include="..\arctic\engine\gl_state.h" />
+    <ClInclude Include="..\arctic\engine\gl_texture2d.h" />
+    <ClInclude Include="resource.h" />
+    <ClInclude Include="targetver.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\arctic\engine\arctic_input.cpp" />
+    <ClCompile Include="..\arctic\engine\arctic_math.cpp" />
+    <ClCompile Include="..\arctic\engine\arctic_platform_windows.cpp" />
+    <ClCompile Include="..\arctic\engine\easy.cpp" />
+    <ClCompile Include="..\arctic\engine\easy_sound.cpp" />
+    <ClCompile Include="..\arctic\engine\easy_sound_instance.cpp" />
+    <ClCompile Include="..\arctic\engine\easy_sprite.cpp" />
+    <ClCompile Include="..\arctic\engine\easy_sprite_instance.cpp" />
+    <ClCompile Include="..\arctic\engine\engine.cpp" />
+    <ClCompile Include="..\arctic\engine\skeleton.cpp" />
+    <ClCompile Include="..\arctic\engine\mesh_ply.cpp" />
+    <ClCompile Include="..\arctic\engine\mesh_gen_prim_simple.cpp" />
+    <ClCompile Include="..\arctic\engine\dual_complex.cpp" />
+    <ClCompile Include="..\arctic\engine\mesh.cpp" />
+    <ClCompile Include="..\arctic\engine\miniz.c" />
+    <ClCompile Include="..\arctic\engine\bitstream.cpp" />
+    <ClCompile Include="..\arctic\engine\csv.cpp" />
+    <ClCompile Include="..\arctic\engine\mesh_intersect.cpp" />
+    <ClCompile Include="..\arctic\engine\mesh_gen_mod_simple.cpp" />
+    <ClCompile Include="..\arctic\engine\arctic_platform_windows_tcpip.cpp" />
+    <ClCompile Include="..\arctic\engine\wave_function_collapse.cpp" />
+    <ClCompile Include="..\arctic\engine\arctic_platform_pi_tcpip.cpp" />
+    <ClCompile Include="..\arctic\engine\mesh_gen_adjacency.cpp" />
+    <ClCompile Include="..\arctic\engine\arctic_platform_pi_byteorder.cpp" />
+    <ClCompile Include="..\arctic\engine\arctic_platform_pi_input.cpp" />
+    <ClCompile Include="..\arctic\engine\arctic_mixer.cpp" />
+    <ClCompile Include="..\arctic\engine\mtq_spmc_array.cpp" />
+    <ClCompile Include="..\arctic\engine\data_reader.cpp" />
+    <ClCompile Include="..\arctic\engine\arctic_platform_pi_es_egl.cpp" />
+    <ClCompile Include="..\arctic\engine\transform3f.cpp" />
+    <ClCompile Include="..\arctic\engine\mtq_fixed_block_queue.cpp" />
+    <ClCompile Include="..\arctic\engine\arctic_platform_pi_fatal.cpp" />
+    <ClCompile Include="..\arctic\engine\arctic_platform_web.cpp" />
+    <ClCompile Include="..\arctic\engine\gui.cpp" />
+    <ClCompile Include="..\arctic\engine\arctic_sound.cpp" />
+    <ClCompile Include="..\arctic\engine\pugixml.cpp" />
+    <ClCompile Include="..\arctic\engine\ini.cpp" />
+    <ClCompile Include="..\arctic\engine\mesh_gen_face_ops.cpp" />
+    <ClCompile Include="..\arctic\engine\arctic_platform_web_sound.cpp" />
+    <ClCompile Include="..\arctic\engine\quaternion.cpp" />
+    <ClCompile Include="..\arctic\engine\arctic_platform_pi_filesystem.cpp" />
+    <ClCompile Include="..\arctic\engine\arctic_platform_windows_sound.cpp" />
+    <ClCompile Include="..\arctic\engine\arctic_platform_pi_opengl_glx.cpp" />
+    <ClCompile Include="..\arctic\engine\mesh_gen_ite_simple.cpp" />
+    <ClCompile Include="..\arctic\engine\mesh_obj.cpp" />
+    <ClCompile Include="..\arctic\engine\data_writer.cpp" />
+    <ClCompile Include="..\arctic\engine\sound_handle.cpp" />
+    <ClCompile Include="..\arctic\engine\ofbx.cpp" />
+    <ClCompile Include="..\arctic\engine\arctic_platform_pi_sound.cpp" />
+    <ClCompile Include="..\arctic\engine\mesh_gen_mod_complex.cpp" />
+    <ClCompile Include="..\arctic\engine\unicode.cpp" />
+    <ClCompile Include="..\arctic\engine\font.cpp" />
+    <ClCompile Include="..\arctic\engine\log.cpp" />
+    <ClCompile Include="..\arctic\engine\easy_hw_sprite.cpp" />
+    <ClCompile Include="..\arctic\engine\easy_hw_sprite_instance.cpp" />
+    <ClCompile Include="..\arctic\engine\gl_buffer.cpp" />
+    <ClCompile Include="..\arctic\engine\gl_framebuffer.cpp" />
+    <ClCompile Include="..\arctic\engine\gl_program.cpp" />
+    <ClCompile Include="..\arctic\engine\gl_state.cpp" />
+    <ClCompile Include="..\arctic\engine\gl_texture2d.cpp" />
+    <ClCompile Include="main.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+      <SDLCheck Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+      </SDLCheck>
+      <SDLCheck Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+      </SDLCheck>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="resource.rc" />
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="app_icon.ico" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>
