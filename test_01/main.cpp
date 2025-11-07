@@ -1,5 +1,6 @@
 #include "engine/easy.h"
 #include "engine/arctic_platform_tcpip.h"
+#include "engine/optionparser.h"
 #include "circular_buffer.h"
 #include <vector>
 #include <deque>
@@ -12,12 +13,14 @@
 #include <queue>
 #include <condition_variable>
 #include <mutex>
+#include "engine/optionparser.h"
 
 using namespace arctic;  // NOLINT
 
-// Network configuration
-const char *kServerAddress = "127.0.0.1";
-constexpr uint16_t kServerPort = 27000;
+// Network configuration (defaults, can be overridden by command line)
+std::string g_server_address = "127.0.0.1";
+uint16_t g_server_port = 1499;
+uint32_t g_client_connections = 1;
 
 constexpr Ui32 kMaxConnections = 32500;
 constexpr Ui32 kConnectionsPerEmulator = 16250;
@@ -201,7 +204,7 @@ public:
       return false;
     }
 
-    res = socket_.Connect(kServerAddress, kServerPort);
+    res = socket_.Connect(g_server_address.c_str(), g_server_port);
     state_ = kConnStateConnecting;
     *Log() << "Client " << client_id_ << " attempting to connect...";
     return true;
@@ -416,7 +419,7 @@ public:
       return false;
     }
 
-    res = listener_.Bind(kServerAddress, kServerPort, 1000);
+    res = listener_.Bind(g_server_address.c_str(), g_server_port, 1000);
     if (res != kSocketOk) {
       *Log() << "Bind failed: " << listener_.GetLastError();
       return false;
@@ -428,7 +431,7 @@ public:
       return false;
     }
 
-    *Log() << "Server started on " << kServerAddress << ":" << kServerPort;
+    *Log() << "Server started on " << g_server_address << ":" << g_server_port;
     return true;
   }
 
@@ -687,12 +690,13 @@ public:
 
 // Test modes
 enum TestMode {
-  kTestModeServer = 0,
+  kTestModeNotSet = 0,
+  kTestModeServer,
   kTestModeClientEmulator,
   kTestModeRealClient
 };
 
-TestMode g_test_mode = kTestModeServer;
+TestMode g_test_mode = kTestModeNotSet;
 std::unique_ptr<LoadTestServer> g_server;
 std::unique_ptr<ClientEmulator> g_client;
 
@@ -705,6 +709,7 @@ void DrawUI() {
   // Title at top (high from bottom edge)
   char title[256];
   snprintf(title, sizeof(title), "MMORPG Network Load Test - Mode: %s", 
+           g_test_mode == kTestModeNotSet ? "Mode not set, will default to server" :
            g_test_mode == kTestModeServer ? "Server" : 
            g_test_mode == kTestModeClientEmulator ? "Client Emulator" : "Real Client");
   g_font.Draw(title, 20, ScreenSize().y - 50, kTextOriginTop);
@@ -723,7 +728,7 @@ void DrawUI() {
              connecting, error, active, connecting+error+active);
     g_font.Draw(line, 20, y_pos, kTextOriginTop);
     y_pos -= line_height;
-  } else if (g_test_mode == kTestModeServer) {
+  } else if (g_test_mode == kTestModeServer || g_test_mode == kTestModeNotSet) {
     // Server not started yet
     snprintf(line, sizeof(line), "Server not started - Press SPACE to start");
     g_font.Draw(line, 20, y_pos, kTextOriginTop);
@@ -770,7 +775,7 @@ void DrawUI() {
   if (g_test_mode == kTestModeClientEmulator) {
     snprintf(line, sizeof(line), "Target: %d connections, 1 msg/sec client, 20 Hz server", kConnectionsPerEmulator);
   } else if (g_test_mode == kTestModeRealClient) {
-    snprintf(line, sizeof(line), "Target: 1 connection, 1 msg/sec client, 20 Hz server");
+    snprintf(line, sizeof(line), "Target: %d connection(s), 1 msg/sec client, 20 Hz server", g_client_connections);
   } else {
     snprintf(line, sizeof(line), "Target: 32500 total connections, 20 Hz server");
   }
@@ -781,16 +786,99 @@ void DrawUI() {
   g_font.Draw(line, 20, y_pos, kTextOriginTop);
   
   // Instructions at bottom (leave space for ~1 line at bottom)
-  g_font.Draw("Controls:", 20, 155, kTextOriginTop);
-  g_font.Draw("Press 1 for Server mode", 20, 130, kTextOriginTop);
-  g_font.Draw("Press 2 for Client Emulator mode", 20, 105, kTextOriginTop);
-  g_font.Draw("Press 3 for Real Client mode", 20, 80, kTextOriginTop);
-  g_font.Draw("Press SPACE to start/connect, ESC to exit", 20, 55, kTextOriginTop);
   
+  y_pos = 55;
+  g_font.Draw("ESC to exit", 20, y_pos, kTextOriginTop);
+  y_pos += 25;
+  if (g_test_mode == kTestModeNotSet) {
+    g_font.Draw("Press 1 for Server mode", 20, y_pos, kTextOriginTop);
+    y_pos += 25;
+    g_font.Draw("Press 2 for Client Emulator mode", 20, y_pos, kTextOriginTop);
+    y_pos += 25;
+    g_font.Draw("Press 3 for Real Client mode", 20, y_pos, kTextOriginTop);
+    y_pos += 25;
+  }
+  g_font.Draw("Controls:", 20, y_pos, kTextOriginTop);
   ShowFrame();
 }
 
 void EasyMain() {
+  // Parse command line arguments
+  Si32 argc = GetEngine()->GetArgc();
+  const char* const* argv = GetEngine()->GetArgv();
+  
+  arctic::OptionParser parser("MMORPG Network Load Test Tool");
+  
+  // Add command line options
+  parser.AddOption("--help", "-h")
+      .Help("Display this help message and exit.")
+      .NoArguments();
+      
+  parser.AddOption("--mode", "-m")
+      .Help("Test mode: server or client")
+      .SingleArgument();
+      
+  parser.AddOption("--address", "-a")
+      .Help("Server address to connect to")
+      .DefaultValue("127.0.0.1")
+      .ArgumentType<std::string>()
+      .SingleArgument();
+      
+  parser.AddOption("--port", "-p")
+      .Help("Server port")
+      .DefaultValue("1499")
+      .ArgumentType<uint16_t>()
+      .SingleArgument();
+      
+  parser.AddOption("--connections", "-c")
+      .Help("Number of connections for client mode")
+      .DefaultValue("16250")
+      .ArgumentType<uint32_t>()
+      .SingleArgument();
+  
+  // Parse arguments
+  bool is_ok = parser.ParseArgcArgv(argc, const_cast<char const**>(argv));
+  if (!is_ok) {
+    std::cerr << "Error parsing arguments: " << parser.get_last_error();
+    return;
+  }
+  
+  if (parser.HasValue("help")) {
+    std::cout << parser.Help();
+    return;
+  }
+  
+  if (!parser.CheckForMissingArgs()) {
+    std::cerr << "Error: " << parser.get_last_error();
+    return;
+  }
+  
+  if (parser.HasValue("mode")) {
+    std::string mode = parser.GetValue<std::string>("mode", "");
+    if (mode == "server") {
+      g_test_mode = kTestModeServer;
+      *Log() << "Starting in server mode";
+    } else if (mode == "client") {
+      g_test_mode = kTestModeRealClient;
+      *Log() << "Starting in client mode";
+    } else {
+      std::cerr << "Unknown mode: \"" << mode << "\". Valid modes: server, client";
+      return;
+    }
+  }
+
+  // Get server address and port
+  g_server_address = parser.GetValue<std::string>("address", "127.0.0.1");
+  g_server_port = parser.GetValue<uint16_t>("port", 1499);
+  
+  // Get number of connections for client mode
+  g_client_connections = parser.GetValue<uint32_t>("connections", 1);
+  
+  *Log() << "Server address: " << g_server_address << ":" << g_server_port;
+  if (g_test_mode == kTestModeRealClient) {
+    *Log() << "Client connections: " << g_client_connections;
+  }
+
   g_font.Load("data/arctic_one_bmf.fnt");
   ResizeScreen(800, 600);
   SetVSync(false);
@@ -804,23 +892,26 @@ void EasyMain() {
   
   while (!IsKeyDownward(kKeyEscape)) {
     // Handle mode switching
-    if (IsKeyDownward(kKey1)) {
-      g_test_mode = kTestModeServer;
-      g_server.reset();
-      g_client.reset();
-    } else if (IsKeyDownward(kKey2)) {
-      g_test_mode = kTestModeClientEmulator;
-      g_server.reset();
-      g_client.reset();
-    } else if (IsKeyDownward(kKey3)) {
-      g_test_mode = kTestModeRealClient;
-      g_server.reset();
-      g_client.reset();
+    if (g_test_mode == kTestModeNotSet) {
+      if (IsKeyDownward(kKey1)) {
+        g_test_mode = kTestModeServer;
+        g_server.reset();
+        g_client.reset();
+      } else if (IsKeyDownward(kKey2)) {
+        g_test_mode = kTestModeClientEmulator;
+        g_server.reset();
+        g_client.reset();
+      } else if (IsKeyDownward(kKey3)) {
+        g_test_mode = kTestModeRealClient;
+        g_server.reset();
+        g_client.reset();
+      }
     }
     
-    // Handle start/connect
-    if (IsKeyDownward(kKeySpace)) {
+    // start/connect
+    if (g_test_mode != kTestModeNotSet) {
       if (g_test_mode == kTestModeServer && !g_server) {
+        g_test_mode = kTestModeServer;
         g_server = std::make_unique<LoadTestServer>();
         if (g_server->Start()) {
           *Log() << "Server started successfully";
@@ -834,8 +925,8 @@ void EasyMain() {
         *Log() << "Client emulator started, connecting " << kConnectionsPerEmulator << " clients gradually...";
       } else if (g_test_mode == kTestModeRealClient && !g_client) {
         *Log() << "Starting real client...";
-        g_client = std::make_unique<ClientEmulator>(0, 1); // Only 1 connection for real client
-        *Log() << "Real client started, connecting 1 client...";
+        g_client = std::make_unique<ClientEmulator>(0, g_client_connections);
+        *Log() << "Real client started, connecting " << g_client_connections << " client(s)...";
       }
     }
     
@@ -854,3 +945,24 @@ void EasyMain() {
   
   *Log() << "Load test completed";
 }
+
+#ifdef ARCTIC_NO_MAIN
+namespace arctic {
+  extern std::string PrepareInitialPath();
+};
+
+int main(int argc, char **argv) {
+  std::string initial_path = arctic::PrepareInitialPath();
+  arctic::StartLogger();
+  arctic::HeadlessPlatformInit();
+  arctic::GetEngine()->SetArgcArgv(argc,
+    const_cast<const char **>(argv));
+
+  arctic::GetEngine()->SetInitialPath(initial_path);
+  arctic::GetEngine()->HeadlessInit();
+
+  EasyMain();
+
+  return 0;
+}
+#endif  // ARCTIC_NO_MAIN
