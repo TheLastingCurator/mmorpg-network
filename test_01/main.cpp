@@ -13,6 +13,9 @@
 #include <queue>
 #include <condition_variable>
 #include <mutex>
+#include <sstream>
+#include <iomanip>
+#include <algorithm>
 #include "engine/optionparser.h"
 
 using namespace arctic;  // NOLINT
@@ -29,6 +32,8 @@ constexpr Ui32 kGameTickMs = 50;  // 20 ticks per second
 constexpr size_t kClientInputSize = 16;     // 16 bytes
 constexpr size_t kServerStateSize = 43;     // 43 bytes
 constexpr Ui32 kStatesPerSecond = 20;       // 20 messages per second
+
+bool g_is_headless = false;
 
 #pragma pack(push, 1)
 // Client -> Server: Input message
@@ -53,7 +58,6 @@ struct Metrics {
   
   // Separate counters for server and client
   std::atomic<Ui64> server_active_connections{0};
-  std::atomic<Ui64> client_active_connections{0};
   
   // Speed measurement
   std::atomic<Ui64> last_bytes_sent{0};
@@ -174,6 +178,7 @@ private:
   CircularBuffer send_buffer_;
   CircularBuffer recv_buffer_;
   ClientInput input_;
+  double last_input_send_time_;
 
 public:
   ClientConnection(Ui32 client_id) 
@@ -181,9 +186,14 @@ public:
     , client_id_(client_id)
     , send_buffer_(1024)   // 1KB send buffer (power of 2)
     , recv_buffer_(16384)  // 16KB receive buffer (power of 2)
+    , last_input_send_time_(0.0)
     {
       memset(input_.data, 1, kClientInputSize);
     }
+
+  std::string GetLastError() const {
+    return socket_.GetLastError();
+  }
 
   bool Connect() {
     // Reset state and create new socket
@@ -198,20 +208,32 @@ public:
     }
 
     SocketResult res = socket_.SetSoNonblocking(true);
-    if (res != kSocketOk) {
+    if (res != SocketResult::kSocketOk) {
+      *Log() << "C SetSoNonblocking failed for client " << client_id_ << ": " << socket_.GetLastError();
       state_ = kConnStateError;
       g_metrics.connection_errors++;
       return false;
     }
 
-    res = socket_.Connect(g_server_address.c_str(), g_server_port);
+    SocketConnectResult connect_res = socket_.Connect(g_server_address.c_str(), g_server_port);
     state_ = kConnStateConnecting;
-    *Log() << "Client " << client_id_ << " attempting to connect...";
-    return true;
+    if (connect_res == SocketConnectResult::kSocketOk) {
+      state_ = kConnStateActive;
+      *Log() << "C Connect: Client " << client_id_ << " became active after async connect";
+      return true;
+    } else if (connect_res == SocketConnectResult::kSocketConnectionInProgress) {
+      state_ = kConnStateConnecting;
+      return true;
+    } else {
+      *Log() << "C Connect failed for client " << client_id_ << ": " << socket_.GetLastError();
+      state_ = kConnStateError;
+      g_metrics.connection_errors++;
+      return false;
+    }
   }
 
   void SendInput() {
-    if (state_ != kConnStateActive && state_ != kConnStateConnecting) {
+    if (state_ != kConnStateActive) {
       return;
     }
     send_buffer_.Write(&input_, kClientInputSize);
@@ -221,25 +243,52 @@ public:
     if (state_ == kConnStateDisconnected || state_ == kConnStateError) {
       return;
     }
-    // If we're in connecting state, send initial message to establish connection
-    if (state_ == kConnStateConnecting && send_buffer_.IsEmpty()) {
-      SendInput();
+    // Handle connection in progress
+    if (socket_.GetState() == SocketState::kConnectionInProgress) {
+      socket_.UpdateConnectionInProgressState();
+      if (socket_.GetState() == SocketState::kDisconnected) {
+        state_ = kConnStateError;
+        g_metrics.connection_errors++;
+        return;
+      }
+      if (socket_.GetState() == SocketState::kConnectionInProgress) {
+        // Still connecting, don't try to send data
+        return;
+      }
+      // If socket became connected, update client state
+      if (socket_.GetState() == SocketState::kConnected && state_ == kConnStateConnecting) {
+        state_ = kConnStateActive;
+        *Log() << "C Update: Client " << client_id_ << " became active after async connect";
+      }
     }
     
+    // Only proceed with data operations if socket is connected and client is active
+    if (socket_.GetState() != SocketState::kConnected || state_ != kConnStateActive) {
+      return;
+    }
+    
+    // Send input only once per second when socket is connected
+    double current_time = GetEngine()->GetTime();
+    if (current_time - last_input_send_time_ >= 1.0) {
+      SendInput();
+      last_input_send_time_ = current_time;
+    }
     // Try to send data using continuous region for efficiency
     const uint8_t* send_ptr;
     size_t send_size;
     if (send_buffer_.GetContinuousReadRegion(&send_ptr, &send_size)) {
       size_t written = 0;
       SocketResult res = socket_.Write(reinterpret_cast<const char*>(send_ptr), send_size, &written);
-      if (res == kSocketOk && written > 0) {
+      if (res == SocketResult::kSocketOk && written > 0) {
         g_metrics.bytes_sent += written;
         send_buffer_.AdvanceReadPosition(written);
-      } else if (res == kSocketConnectionReset) {
+      } else if (res == SocketResult::kSocketConnectionReset) {
+        *Log() << "C Write failed (kSocketConnectionReset) for client " << client_id_ << ": " << socket_.GetLastError();
         state_ = kConnStateError;
         g_metrics.connection_errors++;
         return;
-      } else if (res == kSocketError) {
+      } else if (res == SocketResult::kSocketError) {
+        *Log() << "C Write failed (kSocketError) for client " << client_id_ << ": " << socket_.GetLastError();
         state_ = kConnStateError;
         g_metrics.connection_errors++;
         return;
@@ -252,15 +301,16 @@ public:
     if (recv_buffer_.GetContinuousWriteRegion(&recv_ptr, &recv_space)) {
       size_t read = 0;
       SocketResult read_res = socket_.Read(reinterpret_cast<char*>(recv_ptr), recv_space, &read);
-      if (read_res == kSocketOk && read > 0) {
+      if (read_res == SocketResult::kSocketOk && read > 0) {
         recv_buffer_.AdvanceWritePosition(read);
         g_metrics.bytes_received += read;
         ProcessReceivedData();
-      } else if (read_res == kSocketConnectionReset) {
-        // Only handle connection reset - ignore all other errors
+      } else if (read_res == SocketResult::kSocketConnectionReset) {
+        *Log() << "C Read failed (kSocketConnectionReset) for client " << client_id_ << ": " << socket_.GetLastError();
         state_ = kConnStateError;
         g_metrics.connection_errors++;
-      } else if (read_res == kSocketError) {
+      } else if (read_res == SocketResult::kSocketError) {
+        *Log() << "C Read failed (kSocketError) for client " << client_id_ << ": " << socket_.GetLastError();
         state_ = kConnStateError;
         g_metrics.connection_errors++;
         return;
@@ -276,18 +326,13 @@ public:
         ProcessServerState(&state);
         g_metrics.messages_received++;
       } else {
-        *Log() << "ERROR: ProcessReceivedData: read " << read << " bytes, expected " << kServerStateSize << " bytes";
+        *Log() << "C ERROR: ProcessReceivedData: read " << read << " bytes, expected " << kServerStateSize << " bytes";
         break;
       }
     }
   }
 
   void ProcessServerState(ServerState* state) {
-    if (state_ == kConnStateConnecting) {
-      state_ = kConnStateActive;
-      g_metrics.client_active_connections++;
-      *Log() << "Client " << client_id_ << " became active (total: " << g_metrics.client_active_connections.load() << ")";
-    }
   }
 
   ConnectionState GetState() const { return state_; }
@@ -307,7 +352,7 @@ private:
 public:
   ServerClientConnection(ConnectionSocket&& socket, Ui32 client_id) 
     : socket_(std::move(socket))
-    , state_(kConnStateConnecting)
+    , state_(kConnStateActive)
     , client_id_(client_id)
     , send_buffer_(1024*16)   // 4KB send buffer (power of 2)
     , recv_buffer_(1024)   // 4KB receive buffer (power of 2)
@@ -323,14 +368,16 @@ public:
     if (recv_buffer_.GetContinuousWriteRegion(&recv_ptr, &recv_space)) {
       size_t read = 0;
       SocketResult read_res = socket_.Read(reinterpret_cast<char*>(recv_ptr), recv_space, &read);
-      if (read_res == kSocketOk && read > 0) {
+      if (read_res == SocketResult::kSocketOk && read > 0) {
         recv_buffer_.AdvanceWritePosition(read);
         g_metrics.bytes_received += read;
         ProcessReceivedData();
-      } else if (read_res == kSocketConnectionReset) {
+      } else if (read_res == SocketResult::kSocketConnectionReset) {
+        *Log() << "S Read failed (kSocketConnectionReset) for client " << client_id_ << ": " << socket_.GetLastError();
         state_ = kConnStateError;
         g_metrics.connection_errors++;
-      } else if (read_res == kSocketError) {
+      } else if (read_res == SocketResult::kSocketError) {
+        *Log() << "S Read failed (kSocketError) for client " << client_id_ << ": " << socket_.GetLastError();
         state_ = kConnStateError;
         g_metrics.connection_errors++;
       }
@@ -342,10 +389,15 @@ public:
     if (send_buffer_.GetContinuousReadRegion(&send_ptr, &send_size)) {
       size_t written = 0;
       SocketResult write_res = socket_.Write(reinterpret_cast<const char*>(send_ptr), send_size, &written);
-      if (write_res == kSocketOk && written > 0) {
+      if (write_res == SocketResult::kSocketOk && written > 0) {
         send_buffer_.AdvanceReadPosition(written);
         g_metrics.bytes_sent += written;
-      } else if (write_res == kSocketConnectionReset) {
+      } else if (write_res == SocketResult::kSocketConnectionReset) {
+        *Log() << "S Write failed (kSocketConnectionReset) for client " << client_id_ << ": " << socket_.GetLastError();
+        state_ = kConnStateError;
+        g_metrics.connection_errors++;
+      } else if (write_res == SocketResult::kSocketError) {
+        *Log() << "S Write failed (kSocketError) for client " << client_id_ << ": " << socket_.GetLastError();
         state_ = kConnStateError;
         g_metrics.connection_errors++;
       }
@@ -360,22 +412,18 @@ public:
         ProcessClientInput(&input);
         g_metrics.messages_received++;
       } else {
-        *Log() << "ERROR: ProcessReceivedData: read " << read << " bytes, expected " << kClientInputSize << " bytes";
+        *Log() << "S ERROR: ProcessReceivedData: read " << read << " bytes, expected " << kClientInputSize << " bytes";
         break;
       }
     }
   }
 
   void ProcessClientInput(ClientInput* input) {
-    if (state_ == kConnStateConnecting) {
-      state_ = kConnStateActive;
-      
-      *Log() << "Server accepted client " << client_id_;
-    }
   }
 
   void SendServerState() {
-    if (state_ != kConnStateActive && state_ != kConnStateConnecting) return;
+    if (state_ != kConnStateActive)
+      return;
 
     ServerState server_state;
     memset(server_state.data, 1, kServerStateSize);
@@ -395,43 +443,42 @@ private:
   ListenerSocket listener_;
   std::vector<std::unique_ptr<ServerClientConnection>> connections_;
   double last_tick_time_;
-  double last_stats_time_;
   std::unique_ptr<ThreadPool> thread_pool_;
   size_t num_threads_;
 
 public:
-  LoadTestServer() : last_tick_time_(0.0), last_stats_time_(0.0) {
+  LoadTestServer() : last_tick_time_(0.0) {
     num_threads_ = 2;
     thread_pool_ = std::make_unique<ThreadPool>(num_threads_);
-    *Log() << "Created thread pool with " << num_threads_ << " threads";
+    *Log() << "S Created thread pool with " << num_threads_ << " threads";
   }
 
   bool Start() {
     listener_ = ListenerSocket(AddressFamily::kIpV4, SocketProtocol::kTcp);
     if (!listener_.IsValid()) {
-      *Log() << "Failed to create listener socket: " << listener_.GetLastError();
+      *Log() << "S Failed to create listener socket: " << listener_.GetLastError();
       return false;
     }
 
     SocketResult res = listener_.SetSoLinger(false, 0);
-    if (res != kSocketOk) {
-      *Log() << "SetSoLinger failed: " << listener_.GetLastError();
+    if (res != SocketResult::kSocketOk) {
+      *Log() << "S SetSoLinger failed: " << listener_.GetLastError();
       return false;
     }
 
     res = listener_.Bind(g_server_address.c_str(), g_server_port, 1000);
-    if (res != kSocketOk) {
-      *Log() << "Bind failed: " << listener_.GetLastError();
+    if (res != SocketResult::kSocketOk) {
+      *Log() << "S Bind failed: " << listener_.GetLastError();
       return false;
     }
 
     res = listener_.SetSoNonblocking(true);
-    if (res != kSocketOk) {
-      *Log() << "SetSoNonblocking failed: " << listener_.GetLastError();
+    if (res != SocketResult::kSocketOk) {
+      *Log() << "S SetSoNonblocking failed: " << listener_.GetLastError();
       return false;
     }
 
-    *Log() << "Server started on " << g_server_address << ":" << g_server_port;
+    *Log() << "S Server started on " << g_server_address << ":" << g_server_port;
     return true;
   }
 
@@ -449,13 +496,7 @@ public:
 
     UpdateConnections();
     RemoveDisconnectedConnections();
-    
-    
-    
-    if (current_time - last_stats_time_ >= 10.0) {
-      LogStatistics();
-      last_stats_time_ = current_time;
-    }
+  
   }
   
   void GetConnectionStats(int& connecting, int& error, int& active) {
@@ -476,11 +517,11 @@ private:
     for (int i = 0; i < 1000; i++) {
       ConnectionSocket client_socket = listener_.Accept();
       if (!client_socket.IsValid()) {
-        *Log() << "Accept new connections failed: " << client_socket.GetLastError();
+        // *Log() << "Accept new connections failed: " << client_socket.GetLastError();
       } else {
         SocketResult res = client_socket.SetSoNonblocking(true);
-        if (res != kSocketOk) {
-          *Log() << "ERROR: Failed to set client socket non-blocking";
+        if (res != SocketResult::kSocketOk) {
+          *Log() << "S ERROR: Failed to set client socket non-blocking";
         } else {
           accepted_this_call++;
           connections_.emplace_back(std::make_unique<ServerClientConnection>(std::move(client_socket), connections_.size() - 1));
@@ -488,7 +529,7 @@ private:
       }
     }
     if (accepted_this_call > 0) {
-      *Log() << "Server accepted " << accepted_this_call << " connections";
+      *Log() << "S Server accepted " << accepted_this_call << " connections";
     }
   }
 
@@ -525,45 +566,18 @@ private:
       std::remove_if(connections_.begin(), connections_.end(),
         [](const std::unique_ptr<ServerClientConnection>& conn) {
           if (conn->GetState() == kConnStateError) {
-            *Log() << "Removed error connection " << conn->GetClientId();
+            *Log() << "S Removed error connection " << conn->GetClientId();
             return true;
           }
           return false;
         }),
       connections_.end());
-    
-    if (connections_.size() != before_count) {
-      *Log() << "Removed " << (before_count - connections_.size()) << " disconnected clients";
-    }
   }
 
   void SendGameStateUpdates() {
     for (auto& conn : connections_) {
       conn->SendServerState();
     }
-  }
-
-  void LogStatistics() {
-    int connecting = 0, active = 0, error = 0;
-    for (const auto& conn : connections_) {
-      switch (conn->GetState()) {
-        case kConnStateConnecting: connecting++; break;
-        case kConnStateActive: active++; break;
-        case kConnStateError: error++; break;
-        default: break;
-      }
-    }
-    
-    *Log() << "=== Load Test Statistics ===";
-    *Log() << "Total connections: " << connections_.size();
-    *Log() << "  - Connecting: " << connecting;
-    *Log() << "  - Error: " << error;
-    *Log() << "Messages received: " << g_metrics.messages_received.load();
-    *Log() << "Bytes sent: " << g_metrics.bytes_sent.load();
-    *Log() << "Bytes received: " << g_metrics.bytes_received.load();
-    *Log() << "Connection errors: " << g_metrics.connection_errors.load();
-    *Log() << "Ticks processed: " << g_metrics.tick_count.load();
-    *Log() << "============================";
   }
 };
 
@@ -589,7 +603,7 @@ public:
     
     num_threads_ = 2;
     thread_pool_ = std::make_unique<ThreadPool>(num_threads_);
-    *Log() << "ClientEmulator: Created thread pool with " << num_threads_ << " threads";
+    *Log() << "C ClientEmulator: Created thread pool with " << num_threads_ << " threads";
     
     connections_.reserve(count);
     for (Ui32 i = 0; i < count; ++i) {
@@ -600,25 +614,25 @@ public:
   void ConnectAll() {
     double current_time = Time();
     if (current_time - last_connect_time_ >= 0.05) { // 50ms between batches (faster retry)
-      int batch_size = 10;
+      int batch_size = 100;
       int connected_this_batch = 0;
       
       
       
       // retry failed connections
       int retries_this_batch = 0;
-      for (auto& conn : connections_) {
+      for (int i = 0; i < connections_created_; ++i) {
+        ClientConnection* conn = connections_[i].get();
         if (conn->GetState() == kConnStateError && retries_this_batch < batch_size) {
+          *Log() << "C Retrying error connection " << conn->GetClientId() << " that had error: " << conn->GetLastError();
+          conn->Connect();
+          retries_this_batch++;
+          connected_this_batch++; 
+        } else if (conn->GetState() == kConnStateDisconnected && retries_this_batch < batch_size) {
+          *Log() << "C Retrying disconnected connection " << conn->GetClientId() << " that had error: " << conn->GetLastError();
           conn->Connect();
           retries_this_batch++;
           connected_this_batch++;
-          *Log() << "Retrying error connection " << conn->GetClientId();
-        }
-        if (conn->GetState() == kConnStateDisconnected && retries_this_batch < batch_size) {
-          conn->Connect();
-          retries_this_batch++;
-          connected_this_batch++;
-          *Log() << "Retrying disconnected connection " << conn->GetClientId();
         }
       }
 
@@ -630,7 +644,6 @@ public:
       }
       
       last_connect_time_ = current_time;
-      *Log() << "Connected " << connections_created_ << "/" << connection_count_ << " clients (retried " << retries_this_batch << " failed)";
     }
   }
 
@@ -665,7 +678,7 @@ public:
     // Send client input messages once per second
     if (current_time - last_input_time_ >= 1.0) {
       for (auto& conn : connections_) {
-        if (conn->IsActive() || conn->GetState() == kConnStateConnecting) {
+        if (conn->IsActive()) {
           conn->SendInput();
         }
       }
@@ -700,106 +713,91 @@ TestMode g_test_mode = kTestModeNotSet;
 std::unique_ptr<LoadTestServer> g_server;
 std::unique_ptr<ClientEmulator> g_client;
 
+// UI logging
+double g_last_ui_log_time = 0.0;
+
 void DrawUI() {
   Clear();
   
   // Update network speed measurements
   UpdateNetworkSpeed();
   
-  // Title at top (high from bottom edge)
-  char title[256];
-  snprintf(title, sizeof(title), "MMORPG Network Load Test - Mode: %s", 
-           g_test_mode == kTestModeNotSet ? "Mode not set, will default to server" :
-           g_test_mode == kTestModeServer ? "Server" : 
-           g_test_mode == kTestModeClientEmulator ? "Client Emulator" : "Real Client");
-  g_font.Draw(title, 20, ScreenSize().y - 50, kTextOriginTop);
+  // Build all text in stringstream
+  std::stringstream ui_text;
   
-  // Statistics - start from top and go down
-  int y_pos = ScreenSize().y - 100;  // Start high
-  int line_height = 30;
+  // Title
+  ui_text << "MMORPG Network Load Test - Mode: ";
+  if (g_test_mode == kTestModeNotSet) {
+    ui_text << "Mode not set, will default to server";
+  } else if (g_test_mode == kTestModeServer) {
+    ui_text << "Server";
+  } else if (g_test_mode == kTestModeClientEmulator) {
+    ui_text << "Client Emulator";
+  } else {
+    ui_text << "Real Client";
+  }
+  ui_text << "\n\n";
   
-  char line[256];
+  // Connection statistics
   if (g_test_mode == kTestModeServer && g_server) {
-    // Show detailed connection statistics for server
     int connecting, error, active;
     g_server->GetConnectionStats(connecting, error, active);
-    
-    snprintf(line, sizeof(line), "Connections: %d connecting, %d error, %d active (total: %d)", 
-             connecting, error, active, connecting+error+active);
-    g_font.Draw(line, 20, y_pos, kTextOriginTop);
-    y_pos -= line_height;
+    ui_text << "Connections: " << connecting << " connecting, " << error 
+            << " error, " << active << " active (total: " << (connecting+error+active) << ")\n";
   } else if (g_test_mode == kTestModeServer || g_test_mode == kTestModeNotSet) {
-    // Server not started yet
-    snprintf(line, sizeof(line), "Server not started - Press SPACE to start");
-    g_font.Draw(line, 20, y_pos, kTextOriginTop);
-    y_pos -= line_height;
+    ui_text << "Server not started - Press SPACE to start\n";
   } else if (g_client) {
-    // Show detailed connection statistics for client
     int active, connecting, error, total;
     g_client->GetConnectionStats(active, connecting, error, total);
-    
-    snprintf(line, sizeof(line), "Connections: %d active, %d connecting, %d error (total: %d)", 
-             active, connecting, error, total);
-    g_font.Draw(line, 20, y_pos, kTextOriginTop);
-    y_pos -= line_height;
+    ui_text << "Connections: " << active << " active, " << connecting 
+            << " connecting, " << error << " error (total: " << total << ")\n";
   } else {
-    // Client not started yet
     const char* mode_name = (g_test_mode == kTestModeClientEmulator) ? "Client Emulator" : "Real Client";
-    snprintf(line, sizeof(line), "%s not started - Press SPACE to start", mode_name);
-    g_font.Draw(line, 20, y_pos, kTextOriginTop);
-    y_pos -= line_height;
+    ui_text << mode_name << " not started - Press SPACE to start\n";
   }
   
-  snprintf(line, sizeof(line), "Messages Received: %llu", g_metrics.messages_received.load());
-  g_font.Draw(line, 20, y_pos, kTextOriginTop);
-  y_pos -= line_height;
+  // Network statistics
+  ui_text << "Messages Received: " << g_metrics.messages_received.load() << "\n";
+  ui_text << "Bytes Sent: " << g_metrics.bytes_sent.load() 
+          << " (" << std::fixed << std::setprecision(2) << g_metrics.send_speed_mbps.load() << " MB/s)\n";
+  ui_text << "Bytes Received: " << g_metrics.bytes_received.load() 
+          << " (" << std::fixed << std::setprecision(2) << g_metrics.recv_speed_mbps.load() << " MB/s)\n";
+  ui_text << "Connection Errors: " << g_metrics.connection_errors.load() << "\n";
+  ui_text << "Ticks: " << g_metrics.tick_count.load() << "\n";
   
-  snprintf(line, sizeof(line), "Bytes Sent: %llu (%.2f MB/s)", 
-           g_metrics.bytes_sent.load(), g_metrics.send_speed_mbps.load());
-  g_font.Draw(line, 20, y_pos, kTextOriginTop);
-  y_pos -= line_height;
-  
-  snprintf(line, sizeof(line), "Bytes Received: %llu (%.2f MB/s)", 
-           g_metrics.bytes_received.load(), g_metrics.recv_speed_mbps.load());
-  g_font.Draw(line, 20, y_pos, kTextOriginTop);
-  y_pos -= line_height;
-  
-  snprintf(line, sizeof(line), "Connection Errors: %llu", g_metrics.connection_errors.load());
-  g_font.Draw(line, 20, y_pos, kTextOriginTop);
-  y_pos -= line_height;
-  
-  snprintf(line, sizeof(line), "Ticks: %llu", g_metrics.tick_count.load());
-  g_font.Draw(line, 20, y_pos, kTextOriginTop);
-  y_pos -= line_height;
-  
+  // Target configuration
+  ui_text << "Target: ";
   if (g_test_mode == kTestModeClientEmulator) {
-    snprintf(line, sizeof(line), "Target: %d connections, 1 msg/sec client, 20 Hz server", kConnectionsPerEmulator);
+    ui_text << kConnectionsPerEmulator << " connections, 1 msg/sec client, 20 Hz server";
   } else if (g_test_mode == kTestModeRealClient) {
-    snprintf(line, sizeof(line), "Target: %d connection(s), 1 msg/sec client, 20 Hz server", g_client_connections);
+    ui_text << g_client_connections << " connection(s), 1 msg/sec client, 20 Hz server";
   } else {
-    snprintf(line, sizeof(line), "Target: 32500 total connections, 20 Hz server");
+    ui_text << "32500 total connections, 20 Hz server";
   }
-  g_font.Draw(line, 20, y_pos, kTextOriginTop);
-  y_pos -= line_height;
+  ui_text << "\n";
   
-  snprintf(line, sizeof(line), "Protocol: Client 16 bytes -> Server 43 bytes");
-  g_font.Draw(line, 20, y_pos, kTextOriginTop);
+  ui_text << "Protocol: Client 16 bytes -> Server 43 bytes\n\n";
   
-  // Instructions at bottom (leave space for ~1 line at bottom)
-  
-  y_pos = 55;
-  g_font.Draw("ESC to exit", 20, y_pos, kTextOriginTop);
-  y_pos += 25;
-  if (g_test_mode == kTestModeNotSet) {
-    g_font.Draw("Press 1 for Server mode", 20, y_pos, kTextOriginTop);
-    y_pos += 25;
-    g_font.Draw("Press 2 for Client Emulator mode", 20, y_pos, kTextOriginTop);
-    y_pos += 25;
-    g_font.Draw("Press 3 for Real Client mode", 20, y_pos, kTextOriginTop);
-    y_pos += 25;
+  if (!g_is_headless) {
+    ui_text << "ESC to exit\n";
+    if (g_test_mode == kTestModeNotSet) {
+      ui_text << "Press 1 for Server mode\n";
+      ui_text << "Press 2 for Client Emulator mode\n";
+      ui_text << "Press 3 for Real Client mode\n";
+    }
+    ui_text << "Controls:";
   }
-  g_font.Draw("Controls:", 20, y_pos, kTextOriginTop);
-  ShowFrame();
+  
+  double current_time = Time();
+  if (current_time - g_last_ui_log_time >= 5.0) {
+    g_last_ui_log_time = current_time;
+    *Log() << ui_text.str();
+  }
+
+  if (!g_is_headless) {
+    g_font.Draw(ui_text.str().c_str(), 20, ScreenSize().y - 50, kTextOriginTop);
+    ShowFrame();
+  }
 }
 
 void EasyMain() {
@@ -880,8 +878,10 @@ void EasyMain() {
   }
 
   g_font.Load("data/arctic_one_bmf.fnt");
-  ResizeScreen(800, 600);
-  SetVSync(false);
+  if (!g_is_headless) {
+    ResizeScreen(800, 600);
+    SetVSync(false);
+  }
   
   // Initialize speed measurement
   g_metrics.last_speed_time = Time();
@@ -961,6 +961,7 @@ int main(int argc, char **argv) {
   arctic::GetEngine()->SetInitialPath(initial_path);
   arctic::GetEngine()->HeadlessInit();
 
+  g_is_headless = true;
   EasyMain();
 
   return 0;
