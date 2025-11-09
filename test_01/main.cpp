@@ -286,11 +286,13 @@ public:
         *Log() << "C Write failed (kSocketConnectionReset) for client " << client_id_ << ": " << socket_.GetLastError();
         state_ = kConnStateError;
         g_metrics.connection_errors++;
+        send_buffer_.Clear();
         return;
       } else if (res == SocketResult::kSocketError) {
         *Log() << "C Write failed (kSocketError) for client " << client_id_ << ": " << socket_.GetLastError();
         state_ = kConnStateError;
         g_metrics.connection_errors++;
+        send_buffer_.Clear();
         return;
       }
     }
@@ -309,10 +311,13 @@ public:
         *Log() << "C Read failed (kSocketConnectionReset) for client " << client_id_ << ": " << socket_.GetLastError();
         state_ = kConnStateError;
         g_metrics.connection_errors++;
+        recv_buffer_.Clear();
+        return;
       } else if (read_res == SocketResult::kSocketError) {
         *Log() << "C Read failed (kSocketError) for client " << client_id_ << ": " << socket_.GetLastError();
         state_ = kConnStateError;
         g_metrics.connection_errors++;
+        recv_buffer_.Clear();
         return;
       }
     }
@@ -376,10 +381,12 @@ public:
         *Log() << "S Read failed (kSocketConnectionReset) for client " << client_id_ << ": " << socket_.GetLastError();
         state_ = kConnStateError;
         g_metrics.connection_errors++;
+        recv_buffer_.Clear();
       } else if (read_res == SocketResult::kSocketError) {
         *Log() << "S Read failed (kSocketError) for client " << client_id_ << ": " << socket_.GetLastError();
         state_ = kConnStateError;
         g_metrics.connection_errors++;
+        recv_buffer_.Clear();
       }
     }
 
@@ -396,10 +403,12 @@ public:
         *Log() << "S Write failed (kSocketConnectionReset) for client " << client_id_ << ": " << socket_.GetLastError();
         state_ = kConnStateError;
         g_metrics.connection_errors++;
+        send_buffer_.Clear();
       } else if (write_res == SocketResult::kSocketError) {
         *Log() << "S Write failed (kSocketError) for client " << client_id_ << ": " << socket_.GetLastError();
         state_ = kConnStateError;
         g_metrics.connection_errors++;
+        send_buffer_.Clear();
       }
     }
   }
