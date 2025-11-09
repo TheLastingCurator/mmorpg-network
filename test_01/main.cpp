@@ -487,6 +487,12 @@ public:
       return false;
     }
 
+    res = listener_.SetTcpNoDelay(true);
+    if (res != SocketResult::kSocketOk) {
+      *Log() << "S SetTcpNoDelay failed: " << listener_.GetLastError();
+      return false;
+    }
+
     *Log() << "S Server started on " << g_server_address << ":" << g_server_port;
     return true;
   }
@@ -532,8 +538,13 @@ private:
         if (res != SocketResult::kSocketOk) {
           *Log() << "S ERROR: Failed to set client socket non-blocking";
         } else {
-          accepted_this_call++;
-          connections_.emplace_back(std::make_unique<ServerClientConnection>(std::move(client_socket), connections_.size() - 1));
+          res = client_socket.SetTcpNoDelay(true);
+          if (res != SocketResult::kSocketOk) {
+            *Log() << "S ERROR: Failed to set client socket TCP no delay";
+          } else {
+            accepted_this_call++;
+            connections_.emplace_back(std::make_unique<ServerClientConnection>(std::move(client_socket), connections_.size() - 1));
+          }
         }
       }
     }
